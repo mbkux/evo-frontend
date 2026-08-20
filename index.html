@@ -260,7 +260,26 @@
         // Позволяет открыть страницу в обычном браузере для проверки вида интерфейса
         // (передав ?demo_init=... в URL) без реального Telegram — на продакшене не используется.
         const urlParams = new URLSearchParams(window.location.search);
-        let INIT_DATA = (tg && tg.initData) ? tg.initData : (urlParams.get('demo_init') || '');
+
+        // Запасной вариант на случай, если библиотека telegram-web-app.js не загрузилась/не
+        // создала window.Telegram.WebApp (наблюдали на Telegram Desktop у одного из
+        // пользователей). Telegram в любом случае кладёт те же данные
+        // прямо в адрес страницы (window.location.hash, параметр tgWebAppData) —
+        // это та же самая строка, которую официальная библиотека отдала бы в tg.initData,
+        // и бэкенд проверяет её точно так же вне зависимости от источника.
+        function extractInitDataFromHash() {
+            try {
+                const hash = window.location.hash || '';
+                if (!hash.includes('tgWebAppData')) return '';
+                const params = new URLSearchParams(hash.substring(1));
+                return params.get('tgWebAppData') || '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        let INIT_DATA = (tg && tg.initData) ? tg.initData
+            : extractInitDataFromHash() || (urlParams.get('demo_init') || '');
 
         // На Telegram Desktop данные авторизации (initData) иногда доставляются
         // с небольшой задержкой после загрузки страницы (в отличие от мобильных
@@ -272,6 +291,10 @@
             while (!INIT_DATA && Date.now() < deadline) {
                 await new Promise(r => setTimeout(r, stepMs));
                 if (tg && tg.initData) INIT_DATA = tg.initData;
+                else {
+                    const fromHash = extractInitDataFromHash();
+                    if (fromHash) INIT_DATA = fromHash;
+                }
             }
             return INIT_DATA;
         }

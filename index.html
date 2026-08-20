@@ -143,6 +143,7 @@
         <div style="font-size:40px; margin-bottom:15px;">⚠️</div>
         <div style="opacity:0.8; margin-bottom:15px;" id="error-text">Не удалось загрузить данные.</div>
         <button onclick="location.reload()" style="padding:12px 20px; background:#34c759; border:none; border-radius:12px; color:#000; font-weight:700;">Обновить</button>
+        <div id="debug-info" style="margin-top:20px; padding:12px; background:#111; border-radius:10px; font-size:11px; text-align:left; opacity:0.6; max-width:100%; overflow-wrap:break-word; white-space:pre-wrap;"></div>
     </div>
 
     <div id="tab-hero" class="tab-content active">
@@ -296,6 +297,25 @@
             document.getElementById('loading-screen').style.display = 'none';
             document.getElementById('error-screen').style.display = 'flex';
             document.getElementById('error-text').innerText = msg;
+        }
+
+        // Временная техническая информация на экране ошибки — помогает точно увидеть,
+        // чего именно не хватает конкретному клиенту Telegram. Никаких лишних данных
+        // пользователя здесь нет, только технические флаги.
+        function showDebugInfo() {
+            const el = document.getElementById('debug-info');
+            if (!el) return;
+            const info = {
+                tg_object_exists: !!tg,
+                tg_platform: tg ? tg.platform : null,
+                tg_version: tg ? tg.version : null,
+                initData_length: tg ? (tg.initData || '').length : null,
+                initDataUnsafe_keys: (tg && tg.initDataUnsafe) ? Object.keys(tg.initDataUnsafe) : null,
+                location_hash_length: (window.location.hash || '').length,
+                location_hash_has_tgWebAppData: (window.location.hash || '').includes('tgWebAppData'),
+                user_agent: navigator.userAgent,
+            };
+            el.innerText = JSON.stringify(info, null, 2);
         }
 
         // ============ ГЛОБАЛЬНОЕ СОСТОЯНИЕ ============
@@ -709,6 +729,7 @@
             if (!INIT_DATA) await waitForInitData();
             if (!INIT_DATA) {
                 showError('Открой приложение через кнопку в Telegram-боте — без этого нет доступа к твоим данным.');
+                showDebugInfo();
                 return;
             }
             try {

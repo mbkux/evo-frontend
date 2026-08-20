@@ -259,7 +259,21 @@
         // Позволяет открыть страницу в обычном браузере для проверки вида интерфейса
         // (передав ?demo_init=... в URL) без реального Telegram — на продакшене не используется.
         const urlParams = new URLSearchParams(window.location.search);
-        const INIT_DATA = (tg && tg.initData) ? tg.initData : (urlParams.get('demo_init') || '');
+        let INIT_DATA = (tg && tg.initData) ? tg.initData : (urlParams.get('demo_init') || '');
+
+        // На Telegram Desktop данные авторизации (initData) иногда доставляются
+        // с небольшой задержкой после загрузки страницы (в отличие от мобильных
+        // клиентов, где они доступны сразу). Если данных пока нет — недолго
+        // подождём и перепроверим несколько раз, прежде чем считать, что их
+        // действительно нет.
+        async function waitForInitData(timeoutMs = 3000, stepMs = 150) {
+            const deadline = Date.now() + timeoutMs;
+            while (!INIT_DATA && Date.now() < deadline) {
+                await new Promise(r => setTimeout(r, stepMs));
+                if (tg && tg.initData) INIT_DATA = tg.initData;
+            }
+            return INIT_DATA;
+        }
 
         function haptic(type) {
             if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type);
@@ -692,6 +706,7 @@
 
         // ============ ЗАПУСК ============
         async function init() {
+            if (!INIT_DATA) await waitForInitData();
             if (!INIT_DATA) {
                 showError('Открой приложение через кнопку в Telegram-боте — без этого нет доступа к твоим данным.');
                 return;

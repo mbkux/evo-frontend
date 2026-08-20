@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EVO</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0; padding: 15px; padding-bottom: 90px; user-select: none;
+            overflow-x: hidden;
+        }
+
+        :root {
+            --color-primary: #34c759;
+            --bg-card: #1c1c1e;
+            --gold: #ffd700;
+            --silver: #e0e0e0;
+            --bronze: #cd7f32;
+            --blue-check: #3897f0;
+            --legend-grad: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+        }
+
+        /* NAVIGATION */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 65px; background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 1000; padding-bottom: 10px; padding-left: 2px; padding-right: 2px;
+        }
+        .nav-item { display: flex; flex-direction: column; align-items: center; opacity: 0.5; transition: 0.2s; flex: 1; min-width: 0; }
+        .nav-item.active { opacity: 1; transform: scale(1.05); }
+        .nav-icon { font-size: 19px; margin-bottom: 2px; }
+        .nav-label { font-size: 8px; font-weight: 600; white-space: nowrap; }
+
+        .tab-content { display: none; animation: fadeEffect 0.2s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeEffect { from {opacity: 0; transform: translateY(5px);} to {opacity: 1; transform: translateY(0);} }
+
+        /* HEADERS */
+        .hero-header { display: flex; align-items: center; margin-bottom: 20px; background: var(--bg-card); padding: 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        .hero-avatar { width: 60px; height: 60px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-size: 28px; border: 2px solid #fff; margin-right: 15px; }
+        .hero-info { flex: 1; }
+        .hero-class { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+        .hero-name { font-size: 18px; font-weight: 800; }
+
+        .body-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 15px; background: linear-gradient(135deg, #1c1c1e, #2c2c2e);
+            padding: 15px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .wilks-badge { font-size: 14px; color: var(--gold); font-weight: 800; border: 1px solid var(--gold); padding: 4px 8px; border-radius: 6px; }
+
+        /* SCROLLS */
+        .anthro-scroll, .filter-scroll { display: flex; overflow-x: auto; gap: 8px; margin-bottom: 15px; scrollbar-width: none; padding-bottom: 5px; }
+        .anthro-card { min-width: 80px; background: #252527; border-radius: 12px; padding: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .anthro-val { font-size: 16px; font-weight: 800; margin-top: 5px; }
+        .anthro-lbl { font-size: 10px; opacity: 0.5; text-transform: uppercase; }
+        .filter-btn { background: rgba(255,255,255,0.1); border: none; padding: 8px 16px; border-radius: 20px; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .filter-btn.active { background: #fff; color: #000; }
+
+        /* ARENA GRID */
+        .arena-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .discipline-card {
+            background: #252527; border-radius: 16px; padding: 12px;
+            border: 1px solid rgba(255,255,255,0.05); text-align: center;
+            position: relative; overflow: hidden; transition: transform 0.1s;
+        }
+        .discipline-card:active { transform: scale(0.98); }
+
+        .verify-badge { position: absolute; top: 6px; right: 6px; font-size: 12px; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); color: #555; }
+        .verify-blue { background: var(--blue-check); color: #fff; }
+        .verify-gold { background: var(--gold); color: #000; box-shadow: 0 0 5px var(--gold); }
+
+        .disc-name { font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 4px; height: 26px; display: flex; align-items: center; justify-content: center; }
+        .disc-val { font-size: 18px; font-weight: 800; color: #fff; }
+        .disc-rank { font-size: 9px; font-weight: bold; margin-top: 6px; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+        .disc-progress { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+        .disc-fill { height: 100%; background: #34c759; width: 0%; }
+
+        .rank-rookie { color: #888; background: rgba(255,255,255,0.1); }
+        .rank-athlete { color: #fff; background: #007aff; }
+        .rank-master { color: #000; background: var(--silver); }
+        .rank-titan { color: #000; background: var(--gold); }
+        .rank-legend { color: #fff; background: var(--legend-grad); border: 1px solid #fff; }
+
+        /* LEADERBOARD */
+        .leaderboard-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .leader-item { display: flex; align-items: center; padding: 12px; background: #252527; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
+        .leader-item.me { border: 1px solid #34c759; background: rgba(52, 199, 89, 0.1); }
+        .rank-num { font-size: 18px; font-weight: 800; width: 35px; color: #888; text-align: center; }
+        .rank-1 { color: var(--gold); }
+        .leader-info { flex: 1; display: flex; flex-direction: column; margin-left: 10px; }
+        .leader-name { font-weight: 700; font-size: 14px; }
+        .leader-stat { font-size: 11px; opacity: 0.7; }
+        .leader-score { font-size: 16px; font-weight: 800; color: #fff; }
+
+        /* MODAL */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-card { background: #1c1c1e; width: 100%; max-width: 350px; border-radius: 20px; padding: 20px; max-height: 85vh; overflow-y: auto; }
+        .select-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #2c2c2e; margin-bottom: 8px; border-radius: 12px; }
+
+        .quest-item { display: flex; align-items: center; justify-content: space-between; background: #252527; padding: 12px; margin-bottom: 8px; border-radius: 12px; border-left: 4px solid #444; }
+        .quest-item.done { opacity: 0.5; filter: grayscale(1); }
+        .stat-card { background: var(--bg-card); padding: 15px; border-radius: 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .section-title { font-size: 18px; font-weight: 800; margin: 20px 0 10px 5px; }
+        .fab-save { position: fixed; bottom: 85px; right: 20px; width: 44px; height: 44px; border-radius: 22px; background: #34c759; color: #fff; border: none; font-size: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); z-index: 999; }
+
+        /* MIND + HABITS (new) */
+        .mind-card { background: var(--bg-card); border-radius: 16px; padding: 15px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .mind-name { font-weight: 700; font-size: 14px; }
+        .mind-sub { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+        .mind-level { font-size: 22px; font-weight: 800; color: var(--color-primary); }
+        .add-btn { background: var(--color-primary); border: none; color: #000; font-weight: 700; padding: 8px 14px; border-radius: 10px; font-size: 13px; }
+        .habit-item { display: flex; align-items: center; justify-content: space-between; background: #252527; padding: 12px; margin-bottom: 8px; border-radius: 12px; }
+        .habit-check { font-size: 22px; }
+        .habit-name { font-size: 14px; font-weight: 600; flex: 1; margin-left: 10px; }
+        .habit-del { background: none; border: none; color: #555; font-size: 16px; padding: 4px 8px; }
+        .ghost-btn { width: 100%; padding: 12px; background: rgba(255,255,255,0.1); border: none; border-radius: 12px; color: #888; font-weight: 600; }
+        .dashed-btn { width: 100%; padding: 15px; background: rgba(255,255,255,0.05); border: 1px dashed #555; color: #888; border-radius: 12px; font-weight: 600; }
+        .profile-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13px; }
+        .sub-active { color: var(--color-primary); font-weight: 700; }
+        .sub-inactive { color: #888; font-weight: 700; }
+        .loading-screen, .error-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 3000; padding: 30px; text-align: center; }
+        .error-screen { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="loading-screen" id="loading-screen">
+        <div style="font-size:40px; margin-bottom:15px;">🦍</div>
+        <div style="opacity:0.6;">Загрузка EVO...</div>
+    </div>
+
+    <div class="error-screen" id="error-screen">
+        <div style="font-size:40px; margin-bottom:15px;">⚠️</div>
+        <div style="opacity:0.8; margin-bottom:15px;" id="error-text">Не удалось загрузить данные.</div>
+        <button onclick="location.reload()" style="padding:12px 20px; background:#34c759; border:none; border-radius:12px; color:#000; font-weight:700;">Обновить</button>
+    </div>
+
+    <div id="tab-hero" class="tab-content active">
+        <div class="hero-header">
+            <div class="hero-avatar">🦍</div>
+            <div class="hero-info">
+                <div class="hero-class">EVO USER</div>
+                <div class="hero-name" id="hero-rank-display">НОВИЧОК</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size:20px; font-weight:800;" id="total-lvl">1</div>
+                <div style="font-size:10px; opacity:0.5;">УРОВЕНЬ</div>
+            </div>
+        </div>
+        <div class="section-title">⚡ Задачи дня</div>
+        <div id="quests-container"></div>
+        <button class="ghost-btn" onclick="addNewQuest()">+ Задача</button>
+    </div>
+
+    <div id="tab-body" class="tab-content">
+        <div class="body-header">
+            <div><div style="font-size:10px; opacity:0.5;">ВЕС ТЕЛА</div><div style="font-size:20px; font-weight:800;" id="val-weight" onclick="editWeight()">--</div></div>
+            <div class="wilks-badge" id="wilks-display">WILKS: --</div>
+        </div>
+
+        <div class="anthro-scroll">
+            <div class="anthro-card" onclick="editAnthro('chest')"><div class="anthro-lbl">ГРУДЬ</div><div class="anthro-val" id="val-chest">--</div></div>
+            <div class="anthro-card" onclick="editAnthro('waist')"><div class="anthro-lbl">ТАЛИЯ</div><div class="anthro-val" id="val-waist">--</div></div>
+            <div class="anthro-card" onclick="editAnthro('biceps')"><div class="anthro-lbl">БИЦЕПС</div><div class="anthro-val" id="val-biceps">--</div></div>
+        </div>
+
+        <div class="filter-scroll">
+            <button class="filter-btn active" onclick="filterDisc('all', this)">Все</button>
+            <button class="filter-btn" onclick="filterDisc('run', this)">Бег</button>
+            <button class="filter-btn" onclick="filterDisc('power', this)">Сила</button>
+            <button class="filter-btn" onclick="filterDisc('gym', this)">Зал</button>
+            <button class="filter-btn" onclick="filterDisc('cardio', this)">Кардио</button>
+            <button class="filter-btn" onclick="filterDisc('cali', this)">Воркаут</button>
+            <button class="filter-btn" onclick="filterDisc('swim', this)">Плавание</button>
+        </div>
+
+        <div id="arena-container" class="arena-grid"></div>
+        <button class="dashed-btn" onclick="openAddModal()">➕ Добавить дисциплину</button>
+    </div>
+
+    <div id="tab-mind" class="tab-content">
+        <div class="section-title">🧠 Разум</div>
+        <div style="font-size:12px; opacity:0.5; margin-bottom:15px;">Бесконечные навыки — каждая запись даёт +1 уровень</div>
+        <div id="mind-container"></div>
+    </div>
+
+    <div id="tab-habits" class="tab-content">
+        <div class="section-title">✅ Привычки</div>
+        <div style="font-size:12px; opacity:0.5; margin-bottom:15px;">Отмечай выполнение каждый день</div>
+        <div id="habits-container"></div>
+        <button class="ghost-btn" onclick="addNewHabit()">+ Привычка</button>
+    </div>
+
+    <div id="tab-top" class="tab-content">
+        <div class="section-title" style="text-align:center;">🏆 Топ Атлетов</div>
+        <div style="text-align:center; font-size:12px; opacity:0.5; margin-bottom:15px;">Рейтинг по очкам EVO</div>
+        <div class="leaderboard-list" id="leaderboard-container"></div>
+    </div>
+
+    <div id="tab-fin" class="tab-content">
+        <div class="section-title">💰 Казна</div>
+        <div class="stat-card">
+            <div><div class="sub-val">Накопления</div><div class="big-val" style="color:#30d158" id="fin-sav">--</div></div>
+            <button onclick="finAction('sav')" style="background:#30d158; border:none; border-radius:8px; width:40px; height:40px; font-weight:bold;">+</button>
+        </div>
+        <div class="stat-card">
+            <div><div class="sub-val">Долг</div><div class="big-val" style="color:#ff453a" id="fin-debt">--</div></div>
+            <button onclick="finAction('debt')" style="background:#ff453a; border:none; border-radius:8px; width:40px; height:40px; color:#fff; font-weight:bold; font-size:20px;">−</button>
+        </div>
+    </div>
+
+    <div id="tab-profile" class="tab-content">
+        <div class="section-title">👤 Профиль</div>
+        <div class="stat-card" style="flex-direction:column; align-items:stretch;">
+            <div class="profile-row"><span style="opacity:0.6;">Игрок</span><span id="profile-username">--</span></div>
+            <div class="profile-row"><span style="opacity:0.6;">ID</span><span id="profile-userid">--</span></div>
+            <div class="profile-row" style="border-bottom:none;"><span style="opacity:0.6;">Подписка</span><span id="profile-sub-status">--</span></div>
+        </div>
+        <button class="add-btn" style="width:100%; padding:14px; margin-top:10px;" onclick="doSubscribe()" id="subscribe-btn">Оформить подписку — 299 ₽ / 30 дней</button>
+        <div style="font-size:11px; opacity:0.4; margin-top:10px; text-align:center;">Цена ориентировочная, может измениться. Оплата — прямо в Telegram.</div>
+    </div>
+
+    <div class="modal-overlay" id="add-modal">
+        <div class="modal-card">
+            <h3 style="margin-top:0; text-align:center;">Библиотека</h3>
+            <input type="text" id="search-input" placeholder="Поиск..." onkeyup="searchLib()" style="width:100%; padding:10px; background:#333; border:none; border-radius:8px; color:#fff; margin-bottom:10px;">
+            <div id="modal-list"></div>
+            <button onclick="document.getElementById('add-modal').style.display='none'" style="width:100%; padding:12px; margin-top:10px; background:#333; border:none; color:#fff; border-radius:12px;">Закрыть</button>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('tab-hero', this)"><div class="nav-icon">🏠</div><div class="nav-label">Герой</div></div>
+        <div class="nav-item" onclick="switchTab('tab-body', this)"><div class="nav-icon">💪</div><div class="nav-label">Тело</div></div>
+        <div class="nav-item" onclick="switchTab('tab-mind', this)"><div class="nav-icon">🧠</div><div class="nav-label">Разум</div></div>
+        <div class="nav-item" onclick="switchTab('tab-habits', this)"><div class="nav-icon">✅</div><div class="nav-label">Привычки</div></div>
+        <div class="nav-item" onclick="switchTab('tab-top', this)"><div class="nav-icon">🏆</div><div class="nav-label">Топ</div></div>
+        <div class="nav-item" onclick="switchTab('tab-fin', this)"><div class="nav-icon">💰</div><div class="nav-label">Казна</div></div>
+        <div class="nav-item" onclick="switchTab('tab-profile', this)"><div class="nav-icon">👤</div><div class="nav-label">Профиль</div></div>
+    </nav>
+
+    <script>
+        // ============ ПОДКЛЮЧЕНИЕ К TELEGRAM И БЭКЕНДУ ============
+        const API_BASE_URL = 'https://web-production-42d82.up.railway.app';
+
+        const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+        if (tg) { tg.ready(); tg.expand(); }
+
+        // Позволяет открыть страницу в обычном браузере для проверки вида интерфейса
+        // (передав ?demo_init=... в URL) без реального Telegram — на продакшене не используется.
+        const urlParams = new URLSearchParams(window.location.search);
+        const INIT_DATA = (tg && tg.initData) ? tg.initData : (urlParams.get('demo_init') || '');
+
+        function haptic(type) {
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type);
+        }
+
+        async function api(path, options = {}) {
+            const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+            if (INIT_DATA) headers['X-Telegram-Init-Data'] = INIT_DATA;
+            const res = await fetch(API_BASE_URL + path, Object.assign({}, options, { headers }));
+            if (!res.ok) {
+                let detail = '';
+                try { detail = (await res.json()).detail; } catch (e) {}
+                throw new Error(detail || ('Ошибка сервера: ' + res.status));
+            }
+            const ct = res.headers.get('content-type') || '';
+            return ct.includes('application/json') ? res.json() : null;
+        }
+
+        function showError(msg) {
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('error-screen').style.display = 'flex';
+            document.getElementById('error-text').innerText = msg;
+        }
+
+        // ============ ГЛОБАЛЬНОЕ СОСТОЯНИЕ ============
+        let STATE = null; // ответ /api/state
+        let currentFilter = 'all';
+
+        function libFor(id) { return STATE.disciplines_library.find(l => l.id === id); }
+        function myDiscFor(id) { return STATE.user_disciplines.find(d => d.discipline_id === id); }
+
+        function disciplinePct(userDisc, lib) {
+            if (!userDisc || !userDisc.value || userDisc.value <= 0) return 0;
+            let pct;
+            if (lib.value_type === 'max') pct = (userDisc.value / lib.target_record) * 100;
+            else pct = (lib.target_record / userDisc.value) * 100;
+            return pct;
+        }
+
+        function rankForPct(pct, legendName) {
+            let rank = 'НОВИЧОК', rClass = 'rank-rookie';
+            if (pct >= 20) { rank = 'АТЛЕТ'; rClass = 'rank-athlete'; }
+            if (pct >= 60) { rank = 'МАСТЕР'; rClass = 'rank-master'; }
+            if (pct >= 80) { rank = 'ТИТАН'; rClass = 'rank-titan'; }
+            if (pct >= 100) { rank = legendName; rClass = 'rank-legend'; }
+            return { rank, rClass };
+        }
+
+        function characterLevel(totalXp) { return Math.floor(totalXp / 100) + 1; }
+        function characterRankLabel(level) {
+            if (level < 5) return 'НОВИЧОК';
+            if (level < 15) return 'АТЛЕТ';
+            if (level < 30) return 'МАСТЕР';
+            if (level < 50) return 'ТИТАН';
+            return 'ЛЕГЕНДА';
+        }
+
+        // ============ ГЕРОЙ ============
+        function renderHero() {
+            const level = characterLevel(STATE.profile.total_xp || 0);
+            document.getElementById('total-lvl').innerText = level;
+            document.getElementById('hero-rank-display').innerText = characterRankLabel(level);
+            renderQuests();
+        }
+
+        function renderQuests() {
+            const c = document.getElementById('quests-container');
+            c.innerHTML = '';
+            STATE.quests.forEach(q => {
+                const div = document.createElement('div');
+                div.className = `quest-item ${q.done ? 'done' : ''}`;
+                if (!q.done) div.onclick = () => completeQuest(q.id);
+                div.innerHTML = `<div>${q.name}</div><div>${q.done ? '✅' : '⭕'}</div>`;
+                c.appendChild(div);
+            });
+        }
+
+        async function addNewQuest() {
+            const n = prompt('Задача:');
+            if (!n) return;
+            try {
+                const quest = await api('/api/quests', { method: 'POST', body: JSON.stringify({ name: n }) });
+                STATE.quests.unshift(quest);
+                renderQuests();
+            } catch (e) { alert('Не получилось добавить задачу: ' + e.message); }
+        }
+
+        async function completeQuest(id) {
+            try {
+                const quest = await api(`/api/quests/${id}`, { method: 'PATCH' });
+                const idx = STATE.quests.findIndex(q => q.id === id);
+                STATE.quests[idx] = quest;
+                STATE.profile.total_xp += 10;
+                haptic('success');
+                renderQuests();
+                renderHero();
+            } catch (e) { alert('Не получилось: ' + e.message); }
+        }
+
+        // ============ ТЕЛО ============
+        function renderBody() {
+            const p = STATE.profile;
+            document.getElementById('val-weight').innerText = (p.weight != null ? p.weight : '--') + ' кг';
+            document.getElementById('val-chest').innerText = p.chest != null ? p.chest : '--';
+            document.getElementById('val-waist').innerText = p.waist != null ? p.waist : '--';
+            document.getElementById('val-biceps').innerText = p.biceps != null ? p.biceps : '--';
+            renderArena(currentFilter);
+        }
+
+        function renderArena(filter = 'all') {
+            currentFilter = filter;
+            const c = document.getElementById('arena-container');
+            c.innerHTML = '';
+            STATE.user_disciplines.forEach(d => {
+                const lib = libFor(d.discipline_id);
+                if (!lib) return;
+                if (filter !== 'all' && lib.category !== filter) return;
+
+                const pct = disciplinePct(d, lib);
+                const { rank, rClass } = rankForPct(pct, lib.legend_name);
+
+                let verClass = ''; let verIcon = '🛡️';
+                if (d.verification === 1) { verClass = 'verify-blue'; verIcon = '📷'; }
+                if (d.verification === 2) { verClass = 'verify-gold'; verIcon = '🏆'; }
+
+                const card = document.createElement('div');
+                card.className = 'discipline-card';
+                card.onclick = () => updateDisc(d.discipline_id);
+                card.innerHTML = `
+                    <div class="verify-badge ${verClass}">${verIcon}</div>
+                    <div class="disc-name">${lib.name}</div>
+                    <div class="disc-val">${d.value || '--'} <span style="font-size:10px;">${lib.unit}</span></div>
+                    <div class="disc-progress"><div class="disc-fill" style="width:${Math.min(pct,100)}%; background:${pct>=100 ? 'var(--legend-grad)' : ''}"></div></div>
+                    <div class="disc-rank ${rClass}">${rank}</div>
+                `;
+                c.appendChild(card);
+            });
+            updateWilks();
+        }
+
+        function searchLib() {
+            const val = document.getElementById('search-input').value.toLowerCase();
+            const list = document.getElementById('modal-list');
+            list.innerHTML = '';
+            STATE.disciplines_library.forEach(lib => {
+                if (myDiscFor(lib.id)) return;
+                if (!lib.name.toLowerCase().includes(val) && !lib.legend_name.toLowerCase().includes(val)) return;
+                const div = document.createElement('div');
+                div.className = 'select-item';
+                div.innerHTML = `<div><b>${lib.name}</b><div style="font-size:10px; opacity:0.5;">🏆 REC: ${lib.target_record} ${lib.unit} (${lib.legend_name})</div></div><button style="background:none; border:none; color:#34c759; font-weight:bold; font-size:20px;">+</button>`;
+                div.onclick = () => addDiscipline(lib.id);
+                list.appendChild(div);
+            });
+        }
+
+        async function addDiscipline(discId) {
+            try {
+                const row = await api('/api/disciplines', { method: 'POST', body: JSON.stringify({ discipline_id: discId, value: 0 }) });
+                STATE.user_disciplines.push(row);
+                document.getElementById('add-modal').style.display = 'none';
+                renderArena(currentFilter);
+            } catch (e) { alert('Не получилось добавить: ' + e.message); }
+        }
+
+        async function updateDisc(discId) {
+            const d = myDiscFor(discId);
+            const lib = libFor(discId);
+            let a = prompt(`1. Ввести (формат ${lib.unit})\n2. Верификация\n3. Удалить`);
+            if (a === '1') {
+                let v = prompt(`Результат (${lib.unit}):`);
+                if (v) {
+                    d.value = parseFloat(v.replace(',', '.'));
+                    await saveDiscipline(d);
+                }
+            }
+            if (a === '2') {
+                let l = prompt('0-Нет, 1-Фото, 2-Офиц. документ');
+                if (l !== null) {
+                    d.verification = parseInt(l) || 0;
+                    await saveDiscipline(d);
+                }
+            }
+            if (a === '3') {
+                if (confirm('Убрать дисциплину?')) {
+                    try {
+                        await api(`/api/disciplines/${discId}`, { method: 'DELETE' });
+                        STATE.user_disciplines = STATE.user_disciplines.filter(x => x.discipline_id !== discId);
+                    } catch (e) { alert('Не получилось удалить: ' + e.message); }
+                }
+            }
+            renderArena(currentFilter);
+        }
+
+        async function saveDiscipline(d) {
+            try {
+                const row = await api('/api/disciplines', {
+                    method: 'POST',
+                    body: JSON.stringify({ discipline_id: d.discipline_id, value: d.value, verification: d.verification, proof_file_id: d.proof_file_id })
+                });
+                Object.assign(d, row);
+                STATE.profile.total_xp = (await api('/api/state')).profile.total_xp;
+                renderHero();
+            } catch (e) { alert('Не получилось сохранить: ' + e.message); }
+        }
+
+        function openAddModal() { document.getElementById('search-input').value = ''; searchLib(); document.getElementById('add-modal').style.display = 'flex'; }
+
+        async function editWeight() {
+            let v = prompt('Вес (кг):');
+            if (!v) return;
+            const weight = parseFloat(v.replace(',', '.'));
+            try {
+                const row = await api('/api/body', { method: 'POST', body: JSON.stringify({ weight }) });
+                STATE.profile = Object.assign(STATE.profile, row);
+                renderBody();
+            } catch (e) { alert('Не получилось сохранить: ' + e.message); }
+        }
+
+        async function editAnthro(k) {
+            let v = prompt('Значение (см):');
+            if (!v) return;
+            const value = parseFloat(v.replace(',', '.'));
+            try {
+                const row = await api('/api/body', { method: 'POST', body: JSON.stringify({ [k]: value }) });
+                STATE.profile = Object.assign(STATE.profile, row);
+                renderBody();
+            } catch (e) { alert('Не получилось сохранить: ' + e.message); }
+        }
+
+        function updateWilks() {
+            const w = STATE.profile.weight; let total = 0;
+            ['bench', 'squat', 'deadlift'].forEach(id => { const d = myDiscFor(id); if (d && d.value) total += d.value; });
+            let score = 0;
+            if (total > 0 && w > 0) score = Math.floor(total * (500 / w) / 5);
+            document.getElementById('wilks-display').innerText = `WILKS: ${score}`;
+        }
+
+        function filterDisc(c, b) { document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); renderArena(c); }
+
+        // ============ РАЗУМ ============
+        // Простая русская плюрализация для единиц бесконечных навыков (книга/курс/работа и похожие слова).
+        function pluralizeUnit(word, n) {
+            const mod10 = n % 10, mod100 = n % 100;
+            const hushing = ['г', 'к', 'х', 'ж', 'ш', 'ч', 'щ'];
+            if (word.endsWith('а')) {
+                const stem = word.slice(0, -1);
+                const lastCons = stem.slice(-1);
+                const softEnding = hushing.includes(lastCons) ? 'и' : 'ы';
+                if (mod10 === 1 && mod100 !== 11) return word;
+                if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return stem + softEnding;
+                return stem;
+            }
+            // мужской тип на согласный (курс -> курса / курсов)
+            if (mod10 === 1 && mod100 !== 11) return word;
+            if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return word + 'а';
+            return word + 'ов';
+        }
+
+        function renderMind() {
+            const c = document.getElementById('mind-container');
+            c.innerHTML = '';
+            STATE.infinite_skills.forEach(skill => {
+                const div = document.createElement('div');
+                div.className = 'mind-card';
+                div.innerHTML = `
+                    <div>
+                        <div class="mind-name">${skill.name}</div>
+                        <div class="mind-sub">${skill.level} ${pluralizeUnit(skill.unit_label, skill.level)}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="mind-level">${skill.level}</div>
+                        <button class="add-btn" onclick="addMindEntry('${skill.id}')">+1</button>
+                    </div>
+                `;
+                c.appendChild(div);
+            });
+        }
+
+        async function addMindEntry(skillId) {
+            const title = prompt('Название (необязательно):') || null;
+            try {
+                const res = await api('/api/infinite-skills/entries', { method: 'POST', body: JSON.stringify({ skill_id: skillId, title }) });
+                const skill = STATE.infinite_skills.find(s => s.id === skillId);
+                skill.level = res.level;
+                STATE.profile.total_xp += 20;
+                haptic('success');
+                renderMind();
+                renderHero();
+            } catch (e) { alert('Не получилось: ' + e.message); }
+        }
+
+        // ============ ПРИВЫЧКИ ============
+        function renderHabits() {
+            const c = document.getElementById('habits-container');
+            c.innerHTML = '';
+            if (!STATE.habits.length) {
+                c.innerHTML = '<div style="opacity:0.5; text-align:center; padding:20px;">Пока нет привычек — добавь первую</div>';
+                return;
+            }
+            STATE.habits.forEach(h => {
+                const div = document.createElement('div');
+                div.className = 'habit-item';
+                div.innerHTML = `
+                    <div class="habit-check" style="cursor:pointer;">${h.done_today ? '✅' : '⭕'}</div>
+                    <div class="habit-name">${h.name}</div>
+                    <button class="habit-del">✕</button>
+                `;
+                div.querySelector('.habit-check').onclick = () => toggleHabit(h);
+                div.querySelector('.habit-del').onclick = () => deleteHabit(h.id);
+                c.appendChild(div);
+            });
+        }
+
+        async function toggleHabit(h) {
+            const newVal = !h.done_today;
+            try {
+                await api('/api/habits/log', { method: 'POST', body: JSON.stringify({ logs: [{ habit_id: h.id, completed: newVal }] }) });
+                h.done_today = newVal;
+                haptic('success');
+                renderHabits();
+            } catch (e) { alert('Не получилось: ' + e.message); }
+        }
+
+        async function addNewHabit() {
+            const n = prompt('Название привычки (например «Вода 2л»):');
+            if (!n) return;
+            try {
+                const habit = await api('/api/habits', { method: 'POST', body: JSON.stringify({ name: n }) });
+                habit.done_today = false;
+                STATE.habits.push(habit);
+                renderHabits();
+            } catch (e) { alert('Не получилось добавить: ' + e.message); }
+        }
+
+        async function deleteHabit(id) {
+            if (!confirm('Убрать привычку?')) return;
+            try {
+                await api(`/api/habits/${id}`, { method: 'DELETE' });
+                STATE.habits = STATE.habits.filter(h => h.id !== id);
+                renderHabits();
+            } catch (e) { alert('Не получилось удалить: ' + e.message); }
+        }
+
+        // ============ ТОП ============
+        async function loadLeaderboard() {
+            const c = document.getElementById('leaderboard-container');
+            try {
+                const rows = await api('/api/leaderboard');
+                c.innerHTML = '';
+                const myId = STATE.profile.user_id;
+                rows.forEach((r, i) => {
+                    const isMe = r.user_id === myId;
+                    const div = document.createElement('div');
+                    div.className = `leader-item ${isMe ? 'me' : ''}`;
+                    div.innerHTML = `
+                        <div class="rank-num ${i === 0 ? 'rank-1' : ''}">${i + 1}</div>
+                        <div style="font-size:24px;">${isMe ? '🦍' : '👤'}</div>
+                        <div class="leader-info"><div class="leader-name">${isMe ? 'ТЫ' : (r.username || ('Игрок ' + r.user_id))}</div><div class="leader-stat">Уровень ${characterLevel(r.total_xp)}</div></div>
+                        <div class="leader-score">${r.total_xp} XP</div>
+                    `;
+                    c.appendChild(div);
+                });
+                if (!rows.length) c.innerHTML = '<div style="opacity:0.5; text-align:center; padding:20px;">Рейтинг пока пуст</div>';
+            } catch (e) {
+                c.innerHTML = '<div style="opacity:0.5; text-align:center; padding:20px;">Не удалось загрузить рейтинг</div>';
+            }
+        }
+
+        // ============ КАЗНА ============
+        function renderFinance() {
+            document.getElementById('fin-sav').innerText = (STATE.profile.savings || 0).toFixed(2);
+            document.getElementById('fin-debt').innerText = (STATE.profile.debt || 0).toFixed(2);
+        }
+
+        async function finAction(t) {
+            let v = prompt('Сумма:');
+            if (!v) return;
+            v = parseFloat(v.replace(',', '.'));
+            if (isNaN(v)) return;
+            const payload = {};
+            if (t === 'sav') payload.savings = (STATE.profile.savings || 0) + v;
+            else payload.debt = Math.max(0, (STATE.profile.debt || 0) - v);
+            try {
+                const row = await api('/api/finance', { method: 'POST', body: JSON.stringify(payload) });
+                STATE.profile = Object.assign(STATE.profile, row);
+                renderFinance();
+            } catch (e) { alert('Не получилось сохранить: ' + e.message); }
+        }
+
+        // ============ ПРОФИЛЬ ============
+        function renderProfile() {
+            document.getElementById('profile-username').innerText = STATE.profile.username ? ('@' + STATE.profile.username) : '—';
+            document.getElementById('profile-userid').innerText = STATE.profile.user_id;
+            const sub = STATE.subscription;
+            const statusEl = document.getElementById('profile-sub-status');
+            const btn = document.getElementById('subscribe-btn');
+            if (sub.active) {
+                const until = new Date(sub.period_end);
+                statusEl.innerHTML = `<span class="sub-active">Активна до ${until.toLocaleDateString('ru-RU')}</span>`;
+                btn.innerText = 'Продлить подписку';
+            } else {
+                statusEl.innerHTML = '<span class="sub-inactive">Не оформлена</span>';
+                btn.innerText = 'Оформить подписку — 299 ₽ / 30 дней';
+            }
+        }
+
+        async function doSubscribe() {
+            const btn = document.getElementById('subscribe-btn');
+            btn.disabled = true;
+            btn.innerText = 'Отправляем счёт...';
+            try {
+                await api('/api/subscribe', { method: 'POST', body: JSON.stringify({}) });
+                if (tg && tg.showAlert) tg.showAlert('Счёт на оплату отправлен в чат с ботом — оплатите его там, в Telegram.');
+                else alert('Счёт на оплату отправлен в чат с ботом — оплатите его там, в Telegram.');
+            } catch (e) {
+                alert('Не получилось выставить счёт: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                renderProfile();
+            }
+        }
+
+        // ============ ОБЩЕЕ ============
+        function switchTab(id, el) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        // ============ ЗАПУСК ============
+        async function init() {
+            if (!INIT_DATA) {
+                showError('Открой приложение через кнопку в Telegram-боте — без этого нет доступа к твоим данным.');
+                return;
+            }
+            try {
+                STATE = await api('/api/state');
+            } catch (e) {
+                showError('Не удалось загрузить данные: ' + e.message);
+                return;
+            }
+            document.getElementById('loading-screen').style.display = 'none';
+            renderHero();
+            renderBody();
+            renderMind();
+            renderHabits();
+            renderFinance();
+            renderProfile();
+            loadLeaderboard();
+
+            // Поддержка прямых ссылок на вкладку (?tab=tab-mind) — полезно для диагностики и будущих ссылок из бота.
+            const requestedTab = urlParams.get('tab');
+            if (requestedTab) {
+                const navItems = document.querySelectorAll('.nav-item');
+                const target = document.getElementById(requestedTab);
+                const idx = Array.from(document.querySelectorAll('.tab-content')).findIndex(t => t.id === requestedTab);
+                if (target && idx >= 0 && navItems[idx]) switchTab(requestedTab, navItems[idx]);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
